@@ -11,10 +11,13 @@ import monitoring_algorithms
 import environments as envs
 
 # Initialize environment class
-environment = envs.MediumLafayetteFLood(1)
+# environment = envs.MediumLafayetteFLood(0)
+# environment = envs.Baseline_Envirnonment("baseline")
+# environment = envs.ShastaBuffaloSmall()
+
 
 # Initialize monitoring algorithm instance
-way_point_allocator = monitoring_algorithms.QLB(environment, 10, plot="full")
+way_point_allocator = monitoring_algorithms.QLB(environment, 10, priority_points=10 ,plot="full")
 
 # Run the algorithm on the given environment and display all information
 way_point_allocator.run(info="verbose")

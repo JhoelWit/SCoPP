@@ -46,7 +46,7 @@ class algorithm:
             partition_tolerance=None,
             partition_max_iter=10,
             conflict_resolution_mode="bias",
-            planner="Priority_CPP", # "nn" "random_walk" "tsp:brute" "tsp:ga" "Priority_CPP" "Elapsed_Priority" "Priority_CPP_Scalability_Test"
+            planner="nn", # "nn" "random_walk" "tsp:brute" "tsp:ga" "Priority_CPP" "Elapsed_Priority" "True_Elapsed" "SCoPP_Surveillance" "SCoP3_Surveillance" "SCoPE_Surveillance"
     ):
         self.bias_factor = bias_factor
         self.sampling_rate = sampling_rate

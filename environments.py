@@ -37,7 +37,6 @@ class Debugger:
         self.robot_velocity = 10  # meters per second
         self.save_path = "D:\p00hb\Documents\ADAMS Research\SCoPP\demo\Debug/"
 
-
 class VeryLargeLafayetteFLood:
     def __init__(self, UAV):
         self.starting_position = [[30.31600, -91.89790], [30.27491, -91.89797], [30.33890, -92.07346]] * 10
@@ -107,7 +106,7 @@ class SmallLafayetteFLood:
                 elif mode[1] == "noconres":
                     self.save_path = "SmallLafayetteFlood/no_discontinuities/no_conflict_resolution/"
                 else:
-                    self.save_path = "SmallLafayetteFlood/no_discontinuities/"
+                    self.save_path = "D:\p00hb\Documents\ADAMS Research\SCoPP\demo\SmallLafayetteFlood/no_discontinuities/"
 
 
             elif mode[0] == "disc":
@@ -123,9 +122,12 @@ class SmallLafayetteFLood:
                 elif mode[1] == "noconres":
                     self.save_path = "SmallLafayetteFlood/discontinuities/no_conflict_resolution/"
                 else:
-                    self.save_path = "SmallLafayetteFlood/discontinuities/"
+                    self.save_path = "D:\p00hb\Documents\ADAMS Research\SCoPP\demo\SmallLafayetteFlood/discontinuities/"
         else:
-            self.geo_fencing_holes = []
+            self.geo_fencing_holes = [
+                    [[30.2465, -92.1481], [30.2454, -92.1474], [30.2446, -92.1486], [30.2452, -92.1498], [30.2463, -92.1494]]
+                ] #Added for priority_cpp on 11.9.2021
+            # self.geo_fencing_holes = []
             self.save_path = "D:\p00hb\Documents\ADAMS Research\SCoPP\demo\SmallLafayetteFlood/"
             if UAV == 0:  # Map Comparison
                 self.robot_FOV = 105  # degrees
@@ -477,6 +479,7 @@ class Baseline_Envirnonment:
             [[37.53683, 15.06952], [37.53674, 15.06969], [37.53665, 15.06968], [37.53665, 15.06957], [37.53656, 15.06957], [37.53656, 15.06950]],
             [[37.53674, 15.06976], [37.53674, 15.06984], [37.53674, 15.06990], [37.53665, 15.06993], [37.53656, 15.06988], [37.53656, 15.06983], [37.53656, 15.06975]]
             ]
+        self.priority_points = [[37.536137943298485, 15.07003809740479],[37.53610183746795, 15.06960865049789]]
         self.robot_FOV = 5 # degrees
         self.robot_operating_height = 40  # meters
         self.robot_velocity = 4  # meters per second
@@ -529,7 +532,7 @@ class NevadaExploration:
         self.robot_FOV = 50  # degrees
         self.robot_operating_height = 10  # meters
         self.robot_velocity = 10  # meters per second
-        self.save_path = "NevadaExploration/"
+        self.save_path = "D:\p00hb\Documents\ADAMS Research\SCoPP\demo/NevadaExploration/"
 
 
 class OntarioWaterRescue:
@@ -559,3 +562,36 @@ class SanAntonioFarming:
         self.robot_operating_height = 10  # meters
         self.robot_velocity = 10  # meters per second
         self.save_path = "D:\p00hb\Documents\ADAMS Research\SCoPP\demo\SanAntonioFarming/"
+
+class ShastaBuffaloSmall:
+    """Impromptu class made for the SHaSTA simulation
+    """
+    
+    def __init__(self):
+        import pandas as pd
+        import random
+
+        self.geo_filepath = "buildings.csv"
+        self.geo_holes = pd.read_csv(self.geo_filepath,converters={'lat':float,'lon':float})
+        self.coor_filepath = "coordinates.csv"
+        self.coordinates = pd.read_csv(self.coor_filepath,converters={'lat':float,'lon':float})
+
+
+        self.starting_position = [[42.28637979606,-79.57574650363985]]
+        self.boundary_points = [] 
+        for coordinate in range(len(self.coordinates['lat'])):
+            self.boundary_points.append( [self.coordinates['lat'][coordinate],self.coordinates['lon'][coordinate]] )
+        print(self.boundary_points,"\n",len(self.boundary_points))
+        while len(self.boundary_points) > 3:
+            print(len(self.boundary_points))
+            rand = random.randint(0,len(self.boundary_points))
+            self.boundary_points.pop(rand-1)
+        print("-----------------------------------------------------\n",self.boundary_points)
+        self.geo_fencing_holes = []
+        # for holes in range(len(self.geo_holes['lat'])):
+        #     self.geo_fencing_holes.append( [self.geo_holes['lat'][holes],self.geo_holes['lon'][holes]] )
+        self.priority_points = [[40.68245, -73.91100], [40.68245, -73.91110]]
+        self.robot_FOV = 150  # degrees
+        self.robot_operating_height = 2  # meters
+        self.robot_velocity = 4  # meters per second
+        self.save_path = "D:\p00hb\Documents\ADAMS Research\SCoPP\demo\ShastaBuffaloSmall/"

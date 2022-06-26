@@ -7,7 +7,7 @@ from sklearn.cluster import MiniBatchKMeans
 import sklearn.neighbors as skn
 from math import sqrt, tan, radians
 #from Swarm_Surveillance.SCoPP 
-import latlongcartconv as lc
+from SCoPP import latlongcartconv as lc
 import copy
 import time
 import pickle
@@ -17,7 +17,7 @@ import sys #Ditto
 sys.modules['sklearn.externals.six'] = six #Ditto
 import mlrose
 #from Swarm_Surveillance.SCoPP 
-import SCoPP_settings
+from SCoPP import SCoPP_settings
 import random
 
 
@@ -58,6 +58,7 @@ class QLB:
             self,
             environment,
             number_of_robots=None,
+            priority_points = 1, #Added 4.12.22
             plot=False,
             plot_settings=SCoPP_settings.plots(),
             algorithm_settings=SCoPP_settings.algorithm()
@@ -76,12 +77,13 @@ class QLB:
         min_lat = geographical_boundary.bounds[1]
         max_lon = geographical_boundary.bounds[2]
         max_lat = geographical_boundary.bounds[3]
-        while len(geographical_priority_points) != (number_of_robots*10): #Added 7.20.2021 for Scalability Analysis- Comment when adding user points only
+        while len(geographical_priority_points) != (number_of_robots*priority_points): #Added 7.20.2021 for Scalability Analysis- Comment when adding user points only
             random_lon = random.uniform(min_lon, max_lon)
             random_lat = random.uniform(min_lat, max_lat)
             point = Point(random_lon,random_lat)
             if geographical_boundary.contains(point):
                 geographical_priority_points.append([random_lon,random_lat])
+                # print([random_lon,random_lat])
         self.robot_FOV = environment.robot_FOV
         self.robot_operating_height = environment.robot_operating_height
         self.robot_velocity = environment.robot_velocity
@@ -323,7 +325,7 @@ class QLB:
            self.plot_partitioning(self.planner) #Added Self.planner on 6.29.2021
 
         # Return final list of paths per robot
-        return final_paths_in_geographical, priority_points_in_cartesian, self.total_time, self.data_total_mission_completion_time #Added for scalability testing on 7.30.2021
+        return final_paths_in_geographical, priority_points_in_cartesian, self.total_time, self.data_total_mission_completion_time, self.averagepsurvey, paths #Added for scalability testing on 7.30.2021
 
     def discretize_area(self):
         """Discretization phase: distretizes the surveyable area and finds cells which lie within the bounds specified
@@ -622,26 +624,28 @@ class QLB:
         final_partitions = [[] for robot in range(self.number_of_partitions)]
         priority_final_partitions = [[] for robot in range(self.number_of_partitions)] #Added on 6.28.2021 for priority_CPP
         allocated_priority_points = []
-        easier_priority_list = [[] for robot in range(self.number_of_partitions)]
+        self.easier_priority_list = [[] for robot in range(self.number_of_partitions)]
+        points_added = 0
         for robot_id in range(self.number_of_partitions):
             final_partitions[robot_id] = [self.final_partitioning_x[robot_id], self.final_partitioning_y[robot_id]] 
             priority_final_partitions[robot_id] = [self.priority_final_partitioning_x[robot_id], self.priority_final_partitioning_y[robot_id]] #Added on 6.28.2021 for priority_CPP
             for ppoints in range(len(priority_final_partitions[robot_id][0])): 
-                easier_priority_list[robot_id].append([priority_final_partitions[robot_id][0], priority_final_partitions[robot_id][1]])
+                self.easier_priority_list[robot_id].append([priority_final_partitions[robot_id][0], priority_final_partitions[robot_id][1]])
 
             for ppoints in range(len(priority_waypoints_for_robots)): #Added on 7.11.2021 for priority_CPP
                 for points in range(len(final_partitions[robot_id][0])): #Added on 7.11.2021 for priority_CPP
                     if abs(priority_waypoints_for_robots[ppoints][0] - final_partitions[robot_id][0][points]) <= (self.cell_size*2) \
                         and abs(priority_waypoints_for_robots[ppoints][1] - final_partitions[robot_id][1][points]) <= (self.cell_size*2): #Added on 7.11.2021 for priority_CPP
 
-                        if [priority_waypoints_for_robots[ppoints][0],priority_waypoints_for_robots[ppoints][1]] not in easier_priority_list[robot_id]: #Added on 7.11.2021 for priority_CPP
+                        if [priority_waypoints_for_robots[ppoints][0],priority_waypoints_for_robots[ppoints][1]] not in self.easier_priority_list[robot_id]: #Added on 7.11.2021 for priority_CPP
 
                             if [priority_waypoints_for_robots[ppoints][0],priority_waypoints_for_robots[ppoints][1]] not in allocated_priority_points: #Added on 7.11.2021 for priority_CPP
                                 try:
                                     priority_final_partitions[robot_id][0].insert(0,priority_waypoints_for_robots[ppoints][0]) #Added on 6.29.2021 for priority_CPP
                                     priority_final_partitions[robot_id][1].insert(0,priority_waypoints_for_robots[ppoints][1]) #Added on 6.29.2021 for priority_CPP
                                     allocated_priority_points.append([priority_waypoints_for_robots[ppoints][0],priority_waypoints_for_robots[ppoints][1]])
-                                    print("Priority waypoint" , [priority_waypoints_for_robots[ppoints][0],priority_waypoints_for_robots[ppoints][1]] , "added to robot", robot_id) #Added on 7.11.2021 for priority_CPP
+                                    points_added += 1
+                                    #print("Priority waypoint" , [priority_waypoints_for_robots[ppoints][0],priority_waypoints_for_robots[ppoints][1]] , "added to robot", robot_id) #Added on 7.11.2021 for priority_CPP
                                 except IndexError: 
                                     continue 
 
@@ -654,6 +658,7 @@ class QLB:
 
         #print("")
         #print("priority waypoints for robots:",priority_final_partitions) #Added on 6.28.2021 for priority_CPP
+        #print("Total Priority Points added: ", points_added,"/", len(self.priority_points_in_cartesian))
 
         return robot_assignment_information, final_partitions, priority_final_partitions
 
@@ -686,7 +691,60 @@ class QLB:
                     next_position = task_list[indices[task_list.index(current_position)][1]]
                     task_list.remove(current_position)
                     current_position = next_position
+                print('total time for robot',robot+1,'is',sum(waypoint_distances[robot])/self.robot_velocity)
+                self.averagepsurvey = None
 
+        elif planner == "SCoPP_Surveillance":
+            goal_time = 100
+            reshaped_priority_list = [[] for robot in range(self.number_of_partitions)]
+            priority_points_visited = [0 for robot in range(self.number_of_partitions)]
+            priority_points_total = [0 for robot in range(self.number_of_partitions)]
+            priority_points_robot = [[] for robot in range(self.number_of_partitions)]
+            psurvey = []
+            for robot, cell_list in enumerate(waypoints_for_robots):
+                time_elapsed = 0
+                current_position = robot_assignment_information[robot][0:2]
+                task_list = np.transpose(cell_list).tolist()
+                task_list.append(current_position)
+                for ppoints in range(len(priority_waypoints_for_robots[robot][0])): 
+                    reshaped_priority_list[robot].append([priority_waypoints_for_robots[robot][0][ppoints], priority_waypoints_for_robots[robot][1][ppoints]])
+                for ppoints in range(len(self.priority_points_in_cartesian)): #Added 7.10.2021 for attempted varied path 
+                    if [self.priority_points_in_cartesian[ppoints][0] , self.priority_points_in_cartesian[ppoints][1]] in reshaped_priority_list[robot]:
+                        task_list.append([self.priority_points_in_cartesian[ppoints][0],self.priority_points_in_cartesian[ppoints][1]])
+                        priority_points_total[robot] += 1
+                        priority_points_robot[robot].append([self.priority_points_in_cartesian[ppoints][0],self.priority_points_in_cartesian[ppoints][1]])
+                print('total priority points for robot',robot+1,':',priority_points_total[robot])
+                        
+                while True:
+                    if len(task_list) == 1:
+                        waypoint_distances[robot].append(
+                            sqrt((self.optimal_paths[robot][-1][0] - current_position[0]) ** 2 +
+                                 (self.optimal_paths[robot][-1][1] - current_position[1]) ** 2))
+                        self.optimal_paths[robot].append(current_position)
+                        task_list.remove(current_position)
+                        break
+                    if current_position in priority_points_robot[robot] and (time_elapsed < goal_time):
+                        try:
+                            priority_points_robot[robot].remove(current_position)
+                            priority_points_visited[robot] += 1
+                        except:
+                            pass
+                    self.optimal_paths[robot].append(current_position)
+                    nbrs = skn.NearestNeighbors(n_neighbors=2, algorithm='kd_tree', leaf_size=self.leaf_size).fit(
+                        task_list)
+                    distances, indices = nbrs.kneighbors(task_list)
+                    waypoint_distances[robot].append(distances[task_list.index(current_position)][1])
+                    next_position = task_list[indices[task_list.index(current_position)][1]]
+                    task_list.remove(current_position)
+                    current_position = next_position
+                    time_elapsed += distances[task_list.index(current_position)][1] / self.robot_velocity #Added 4.13.22
+                if priority_points_total[robot] != 0:
+                    priority_surveillance_rate = priority_points_visited[robot] / priority_points_total[robot]
+                    psurvey.append(priority_surveillance_rate)
+                    # print('total time for robot',robot+1,'is',sum(waypoint_distances[robot])/self.robot_velocity)
+                    print('priority surveillance rate for robot',robot+1,'is:',priority_surveillance_rate)
+            self.averagepsurvey = np.average(psurvey)
+            print('average surveillance rate:',self.averagepsurvey)
         elif planner == "random_walk":
             for robot, cell_list in enumerate(waypoints_for_robots):
                 current_position = robot_assignment_information[robot][0:2]
@@ -775,17 +833,24 @@ class QLB:
                 waypoint_distances[robot] = distances
 
         elif planner == "Priority_CPP": ##Adding planner for Priority Coverage Path Planning-PCPP
+            reshaped_priority_list = [[] for robot in range(self.number_of_partitions)]
+            time_elapsed_list = []
+            #print(self.priority_points_in_cartesian)
             priority_task_list = [[] for robot in range(self.number_of_partitions)]
             priority_task_index = [0 for robot in range(self.number_of_partitions)]
             for robot, cell_list in enumerate(priority_waypoints_for_robots):
+                time_elapsed = 0 #Recording the time it takes for all priority points to be surveyed
+                for ppoints in range(len(priority_waypoints_for_robots[robot][0])): 
+                    reshaped_priority_list[robot].append([priority_waypoints_for_robots[robot][0][ppoints], priority_waypoints_for_robots[robot][1][ppoints]])
+                #print(reshaped_priority_list)
                 current_position = robot_assignment_information[robot][0:2]
                 task_list = np.transpose(cell_list).tolist()
                 task_list.append(current_position)
                 priority_task_list[robot].append(current_position)
-                for ppoints in range(len(self.priority_points_in_cartesian[0])): #Added 7.10.2021 for attempted varied path 
-                    if self.priority_points_in_cartesian[ppoints][0] in priority_waypoints_for_robots[robot][0] \
-                        and self.priority_points_in_cartesian[ppoints][1] in priority_waypoints_for_robots[robot][1]:
+                for ppoints in range(len(self.priority_points_in_cartesian)): #Added 7.10.2021 for attempted varied path 
+                    if [self.priority_points_in_cartesian[ppoints][0] , self.priority_points_in_cartesian[ppoints][1]] in reshaped_priority_list[robot]:
                         priority_task_list[robot].append([self.priority_points_in_cartesian[ppoints][0],self.priority_points_in_cartesian[ppoints][1]])
+                        #print(priority_task_list[robot])
                         priority_task_index[robot] += 1
                 while True:
                     if len(task_list) == 1:
@@ -796,17 +861,211 @@ class QLB:
                         task_list.remove(current_position)
                         break
                     while priority_task_index[robot] != 0:
+                        # print("robot",robot,"priority points remaining",priority_task_index[robot])
                         self.optimal_paths[robot].append(current_position)
                         nbrs = skn.NearestNeighbors(n_neighbors=2, algorithm='kd_tree', leaf_size=self.leaf_size).fit(
                             priority_task_list[robot])
                         distances, indices = nbrs.kneighbors(priority_task_list[robot])
                         waypoint_distances[robot].append(distances[priority_task_list[robot].index(current_position)][1])
                         next_position = priority_task_list[robot][indices[priority_task_list[robot].index(current_position)][1]]
+                        if next_position == current_position:
+                            priority_task_index[robot] -= 1
+                            continue
+                        else:
+                            task_list.remove(current_position)
+                            priority_task_list[robot].remove(current_position)
+                            current_position = next_position
+                            priority_task_index[robot] -= 1
+                        time_elapsed += distances[priority_task_list[robot].index(current_position)][1] / self.robot_velocity #Added 4.5.22
+                    self.optimal_paths[robot].append(current_position)
+                    nbrs = skn.NearestNeighbors(n_neighbors=2, algorithm='kd_tree', leaf_size=self.leaf_size).fit(
+                        task_list)
+                    distances, indices = nbrs.kneighbors(task_list)
+                    waypoint_distances[robot].append(distances[task_list.index(current_position)][1])
+                    next_position = task_list[indices[task_list.index(current_position)][1]]
+                    task_list.remove(current_position)
+                    current_position = next_position
+                time_elapsed_list.append(time_elapsed)
+                # print('robot',robot,'time to survey all priority points:',time_elapsed)
+                self.averagepsurvey = np.average(time_elapsed_list)
+            print('average time to survey all points',self.averagepsurvey)
+       
+       
+        elif planner == "SCoP3_Surveillance": ##Adding planner for Priority Coverage Path Planning-PCPP
+            goal_time = 100
+            priority_points_visited = [0 for robot in range(self.number_of_partitions)]
+            priority_points_total = [0 for robot in range(self.number_of_partitions)]
+            priority_points_robot = [[] for robot in range(self.number_of_partitions)]
+            psurvey = []
+            reshaped_priority_list = [[] for robot in range(self.number_of_partitions)]
+            time_elapsed_list = []
+            #print(self.priority_points_in_cartesian)
+            priority_task_list = [[] for robot in range(self.number_of_partitions)]
+            priority_task_index = [0 for robot in range(self.number_of_partitions)]
+            for robot, cell_list in enumerate(priority_waypoints_for_robots):
+                time_elapsed = 0 #Recording the time it takes for all priority points to be surveyed
+                for ppoints in range(len(priority_waypoints_for_robots[robot][0])): 
+                    reshaped_priority_list[robot].append([priority_waypoints_for_robots[robot][0][ppoints], priority_waypoints_for_robots[robot][1][ppoints]])
+                #print(reshaped_priority_list)
+                current_position = robot_assignment_information[robot][0:2]
+                task_list = np.transpose(cell_list).tolist()
+                task_list.append(current_position)
+                priority_task_list[robot].append(current_position)
+                for ppoints in range(len(self.priority_points_in_cartesian)): #Added 7.10.2021 for attempted varied path 
+                    if [self.priority_points_in_cartesian[ppoints][0] , self.priority_points_in_cartesian[ppoints][1]] in reshaped_priority_list[robot]:
+                        priority_task_list[robot].append([self.priority_points_in_cartesian[ppoints][0],self.priority_points_in_cartesian[ppoints][1]])
+                        #print(priority_task_list[robot])
+                        priority_task_index[robot] += 1
+                        priority_points_total[robot] += 1
+                        priority_points_robot[robot].append([self.priority_points_in_cartesian[ppoints][0],self.priority_points_in_cartesian[ppoints][1]])
+                print('robot',robot,'has',priority_points_total[robot],'priority points')
+                while True:
+                    if len(task_list) == 1:
+                        waypoint_distances[robot].append(
+                            sqrt((self.optimal_paths[robot][-1][0] - current_position[0]) ** 2 +
+                                    (self.optimal_paths[robot][-1][1] - current_position[1]) ** 2))
+                        self.optimal_paths[robot].append(current_position)
                         task_list.remove(current_position)
-                        priority_task_list[robot].remove(current_position)
-                        current_position = next_position
-                        priority_task_index[robot] -= 1
+                        break
+                    while priority_task_index[robot] != 0:
+                        # print("robot",robot,"priority points remaining",priority_task_index[robot])
+                        self.optimal_paths[robot].append(current_position)
+                        nbrs = skn.NearestNeighbors(n_neighbors=2, algorithm='kd_tree', leaf_size=self.leaf_size).fit(
+                            priority_task_list[robot])
+                        distances, indices = nbrs.kneighbors(priority_task_list[robot])
+                        waypoint_distances[robot].append(distances[priority_task_list[robot].index(current_position)][1])
+                        next_position = priority_task_list[robot][indices[priority_task_list[robot].index(current_position)][1]]
+                        if next_position == current_position:
+                            priority_task_index[robot] -= 1
+                            if time_elapsed < goal_time:
+                                priority_points_visited[robot] += 1
+                            continue
+                        else:
+                            task_list.remove(current_position)
+                            priority_task_list[robot].remove(current_position)
+                            current_position = next_position
+                            priority_task_index[robot] -= 1
+                            if time_elapsed < goal_time:
+                                priority_points_visited[robot] += 1
+                        time_elapsed += distances[priority_task_list[robot].index(current_position)][1] / self.robot_velocity #Added 4.5.22
+                    self.optimal_paths[robot].append(current_position)
+                    nbrs = skn.NearestNeighbors(n_neighbors=2, algorithm='kd_tree', leaf_size=self.leaf_size).fit(
+                        task_list)
+                    distances, indices = nbrs.kneighbors(task_list)
+                    waypoint_distances[robot].append(distances[task_list.index(current_position)][1])
+                    next_position = task_list[indices[task_list.index(current_position)][1]]
+                    task_list.remove(current_position)
+                    current_position = next_position
+                if priority_points_total[robot] != 0:
+                    priority_surveillance_rate = priority_points_visited[robot] / priority_points_total[robot]
+                    psurvey.append(priority_surveillance_rate)
+                    print('total time for robot',robot+1,'is',sum(waypoint_distances[robot])/self.robot_velocity)
+                    print('priority surveillance rate for robot',robot+1,'is:',priority_surveillance_rate)
+            self.averagepsurvey = np.average(psurvey)
+            print('average surveillance rate:',self.averagepsurvey)
 
+       
+       
+       
+        elif planner == "Elapsed_Priority": #Added for Elapsed Priority CPP on 7.17.2021
+            goal_time = float(input("Visit these priority points within the next _ seconds:  "))
+            data_completion_time_per_robot = [0 for robot in range(self.number_of_partitions)]
+            priority_survey_distances = [[] for robot in range(self.number_of_partitions)]
+            trip_distances = [0 for robot in range(self.number_of_partitions)]
+            priority_task_list = [[] for robot in range(self.number_of_partitions)]
+            priority_task_index = [0 for robot in range(self.number_of_partitions)]
+            initial_travel_distance = [0 for robot in range(self.number_of_partitions)]
+            for robot, cell_list in enumerate(priority_waypoints_for_robots):
+                current_position = robot_assignment_information[robot][0:2]
+                task_list = np.transpose(cell_list).tolist()
+                task_list.append(current_position)
+                #priority_task_list[robot].append(current_position)
+                for ppoints in range(len(self.priority_points_in_cartesian)): 
+                    if self.priority_points_in_cartesian[ppoints][0] in priority_waypoints_for_robots[robot][0] \
+                        and self.priority_points_in_cartesian[ppoints][1] in priority_waypoints_for_robots[robot][1]:
+                        priority_task_list[robot].append([self.priority_points_in_cartesian[ppoints][0],self.priority_points_in_cartesian[ppoints][1]])
+                        priority_task_index[robot] += 1
+                area_covered = 0
+                time_elapsed = 0
+                step = 0
+                while time_elapsed < goal_time:
+                    if len(task_list) == 1:
+                        waypoint_distances[robot].append(
+                            sqrt((self.optimal_paths[robot][-1][0] - current_position[0]) ** 2 +
+                                (self.optimal_paths[robot][-1][1] - current_position[1]) ** 2))
+                        self.optimal_paths[robot].append(current_position)
+                        task_list.remove(current_position)
+                        print("Time elapsed never came close to user input time")
+                        break   
+                    # if step == 2:
+                    #     step_size = time_elapsed
+                    #     print("Robot ", (robot+1) , "step size is ", step_size)
+                    if current_position in priority_task_list[robot]:
+                        priority_task_list[robot].remove(current_position)
+                        priority_task_index[robot] -= 1
+                        print("priority point visited")
+                    self.optimal_paths[robot].append(current_position)
+                    nbrs = skn.NearestNeighbors(n_neighbors=2, algorithm='kd_tree', leaf_size=self.leaf_size).fit(
+                        task_list)
+                    distances, indices = nbrs.kneighbors(task_list)
+                    waypoint_distances[robot].append(distances[task_list.index(current_position)][1])
+                    priority_survey_distances[robot].append(distances[task_list.index(current_position)][1])
+                    trip_distances[robot] = sum(waypoint_distances[robot])
+                    if initial_travel_distance[robot] == 0:
+                        initial_travel_distance[robot] = distances[task_list.index(current_position)][1]
+                    next_position = task_list[indices[task_list.index(current_position)][1]]
+                    task_list.remove(current_position)
+                    current_position = next_position
+                    while any(priority_survey_distances[robot]) and (time_elapsed<goal_time):
+                        if trip_distances[robot] <= 0:
+                            continue
+                        elif initial_travel_distance[robot] > 0:
+                            initial_travel_distance[robot] -= self.robot_velocity * self.sampling_rate
+                        elif initial_travel_distance[robot] <= 0:
+                            if len(priority_survey_distances[robot]) != 0:
+                                priority_survey_distances[robot][0] -= self.robot_velocity * self.sampling_rate
+                                if priority_survey_distances[robot][0] <= 0:
+                                    priority_survey_distances[robot].pop(0)
+                                    area_covered += self.cell_area
+                                    #print(area_covered)
+                            if len(priority_survey_distances[robot]) == 0 and data_completion_time_per_robot[robot] == 0:
+                                data_completion_time_per_robot[robot] += time_elapsed
+                        time_elapsed += self.sampling_rate
+                    # time_elapsed += trip_distances[robot] / self.robot_velocity
+                    # print('Time elapsed for robot',robot,' is ',time_elapsed)
+                    step += 1
+                    # print("step ",step)
+                        
+
+
+                print("Time elapsed for robot " +  str(robot+1) + " is currently: " + str(time_elapsed))
+
+                if priority_task_index[robot] != 0:
+                    priority_task_list[robot].append(current_position)
+                while priority_task_index[robot] != 0:
+                    print(priority_task_index[robot])
+                    self.optimal_paths[robot].append(current_position)
+                    nbrs = skn.NearestNeighbors(n_neighbors=2, algorithm='kd_tree', leaf_size=self.leaf_size).fit(
+                        priority_task_list[robot])
+                    distances, indices = nbrs.kneighbors(priority_task_list[robot])
+                    waypoint_distances[robot].append(distances[priority_task_list[robot].index(current_position)][1])
+                    next_position = priority_task_list[robot][indices[priority_task_list[robot].index(current_position)][1]]
+                    try:
+                        task_list.remove(current_position)
+                    except ValueError:
+                        print("Point already visited")
+                    priority_task_list[robot].remove(current_position)
+                    current_position = next_position
+                    priority_task_index[robot] -= 1
+                task_list.append(current_position)
+                while True:
+                    if len(task_list) == 1:
+                        waypoint_distances[robot].append(
+                            sqrt((self.optimal_paths[robot][-1][0] - current_position[0]) ** 2 +
+                                (self.optimal_paths[robot][-1][1] - current_position[1]) ** 2))
+                        self.optimal_paths[robot].append(current_position)
+                        task_list.remove(current_position)
+                        break        
                     self.optimal_paths[robot].append(current_position)
                     nbrs = skn.NearestNeighbors(n_neighbors=2, algorithm='kd_tree', leaf_size=self.leaf_size).fit(
                         task_list)
@@ -816,55 +1075,131 @@ class QLB:
                     task_list.remove(current_position)
                     current_position = next_position
 
-        elif planner == "Elapsed_Priority": #Added for Elapsed Priority CPP on 7.17.2021
-            goal_time = float(input("Visit these priority points within the next _ seconds"))
-            time_start = time.time() 
+        elif planner == "True_Elapsed": #Added for new Elapsed Priority CPP on 11.1.2021
+            # goal_time = float(input("Visit these priority points within the next _ seconds:  "))
+            goal_time = 5
+            elapsed_task_list = [[] for robot in range(self.number_of_partitions)]
+            data_completion_time_per_robot = [0 for robot in range(self.number_of_partitions)]
+            priority_survey_distances = [[] for robot in range(self.number_of_partitions)]
+            trip_distances = [0 for robot in range(self.number_of_partitions)]
+            trip_distances_copy = copy.deepcopy(trip_distances)
             priority_task_list = [[] for robot in range(self.number_of_partitions)]
             priority_task_index = [0 for robot in range(self.number_of_partitions)]
+            initial_travel_distance = [0 for robot in range(self.number_of_partitions)]
+            initial_travel_distance_copy = copy.deepcopy(initial_travel_distance)
             for robot, cell_list in enumerate(priority_waypoints_for_robots):
                 current_position = robot_assignment_information[robot][0:2]
                 task_list = np.transpose(cell_list).tolist()
                 task_list.append(current_position)
-                priority_task_list[robot].append(current_position)
-                for ppoints in range(len(self.priority_points_in_cartesian[0])): 
+                #priority_task_list[robot].append(current_position)
+                for ppoints in range(len(self.priority_points_in_cartesian)): 
                     if self.priority_points_in_cartesian[ppoints][0] in priority_waypoints_for_robots[robot][0] \
                         and self.priority_points_in_cartesian[ppoints][1] in priority_waypoints_for_robots[robot][1]:
                         priority_task_list[robot].append([self.priority_points_in_cartesian[ppoints][0],self.priority_points_in_cartesian[ppoints][1]])
                         priority_task_index[robot] += 1
-                time_elapsed = time.time()-time_start
-                while time_elapsed < goal_time:
-                    while True:
+                priority_task_list_copy = copy.deepcopy(priority_task_list)
+                ppoints_robot = priority_task_index[robot]
+                area_covered = 0
+                time_elapsed = 0
+                priority_survey_time = 0 
+                step = 0
+
+                #If the robot has some priority way-points, then the sub-routine will take effect
+                if priority_task_index[robot] != 0:
+                    priority_task_list_copy[robot].append(current_position)
+                    priority_marker = priority_task_index[robot]
+                    iter_time = 0
+                    iter = 0
+                    while priority_marker != 0:
+                        # print(priority_marker)
+                        nbrs = skn.NearestNeighbors(n_neighbors=2, algorithm='kd_tree', leaf_size=self.leaf_size).fit(
+                            priority_task_list_copy[robot])
+                        distances, indices = nbrs.kneighbors(priority_task_list_copy[robot])
+                        priority_survey_distances[robot].append(distances[priority_task_list_copy[robot].index(current_position)][1])
+                        next_position = priority_task_list_copy[robot][indices[priority_task_list_copy[robot].index(current_position)][1]]
+                        try:
+                            task_list.remove(current_position)
+                        except ValueError:
+                            print("Point already visited")
+                        if iter > 0:
+                            iter_time = (sum(priority_survey_distances[robot]) - priority_survey_distances[robot][0]) / self.robot_velocity
+                        if iter_time > goal_time:
+                            print('robot',robot,'will make it to',iter-1,'priority points out of',ppoints_robot) #Added 4.6.22
+                        iter += 1
+                        priority_task_list_copy[robot].remove(current_position)
+                        current_position = next_position
+                        priority_marker -= 1
+                        
+                        
+                    trip_distances_copy[robot] = sum(priority_survey_distances[robot]) #Iterate these instead, so I can get a feel for how many points each robot visits
+                    survey_time = trip_distances_copy[robot] / self.robot_velocity
+                    # print('distance over velocity is',survey_time)
+                    task_list.append(current_position) 
+                    priority_survey_time = survey_time
+                    time_to_fin = goal_time - priority_survey_time
+                    if time_to_fin < 0:
+                        print('Robot',robot,'will not make it in time')
+                    else:
+                        print('goal time is now', time_to_fin)
+                    print('Time it will take to cover all priority points:',survey_time,'seconds')
+                
+                    priority_survey_time_elapsed = 0
+                    time_elapsed = 0
+                    while priority_survey_time_elapsed < time_to_fin:  
                         if len(task_list) == 1:
                             waypoint_distances[robot].append(
                                 sqrt((self.optimal_paths[robot][-1][0] - current_position[0]) ** 2 +
                                     (self.optimal_paths[robot][-1][1] - current_position[1]) ** 2))
                             self.optimal_paths[robot].append(current_position)
-                            priority_task_index[robot] = 0 #Band Aid
-                            #task_list.remove(current_position)
-                            break                  
+                            task_list.remove(current_position)
+                            print("Time elapsed never came close to user input time")
+                            break   
+                        
+                        if current_position in priority_task_list[robot]:
+                            priority_task_list[robot].remove(current_position)
+                            priority_task_index[robot] -= 1
+                            # print("priority point visited")
                         self.optimal_paths[robot].append(current_position)
                         nbrs = skn.NearestNeighbors(n_neighbors=2, algorithm='kd_tree', leaf_size=self.leaf_size).fit(
                             task_list)
                         distances, indices = nbrs.kneighbors(task_list)
                         waypoint_distances[robot].append(distances[task_list.index(current_position)][1])
+                        priority_survey_distances[robot].append(distances[task_list.index(current_position)][1])
+                        trip_distances[robot] = sum(waypoint_distances[robot])
+                        if initial_travel_distance[robot] == 0:
+                            initial_travel_distance[robot] = distances[task_list.index(current_position)][1]
                         next_position = task_list[indices[task_list.index(current_position)][1]]
                         task_list.remove(current_position)
                         current_position = next_position
-                        time_elapsed = time.time()-time_start #Gives elapsed time in seconds
-                    
-                print("Time elapsed for robot " +  str(robot) + " is currently: " + str(time_elapsed))
+                        priority_survey_time_elapsed += distances[task_list.index(current_position)][1] / self.robot_velocity
+                        step += 1
+                        # print("step ",step)
+                        
 
+                # print('distance over velocity is',priority_survey_time_elapsed)
+                # print("Time elapsed for robot " +  str(robot+1) + " is currently: " + str(priority_survey_time_elapsed) + " Moving to priority points")
+
+                if priority_task_index[robot] != 0:
+                    priority_task_list[robot].append(current_position)
                 while priority_task_index[robot] != 0:
+                    # print('Priority points left for robot',robot+1,'is:',priority_task_index[robot])
                     self.optimal_paths[robot].append(current_position)
                     nbrs = skn.NearestNeighbors(n_neighbors=2, algorithm='kd_tree', leaf_size=self.leaf_size).fit(
                         priority_task_list[robot])
                     distances, indices = nbrs.kneighbors(priority_task_list[robot])
                     waypoint_distances[robot].append(distances[priority_task_list[robot].index(current_position)][1])
+                    priority_survey_distances[robot].append(distances[priority_task_list[robot].index(current_position)][1])
+                    priority_survey_time_elapsed += distances[priority_task_list[robot].index(current_position)][1] / self.robot_velocity
                     next_position = priority_task_list[robot][indices[priority_task_list[robot].index(current_position)][1]]
-                    task_list.remove(current_position)
+                    try:
+                        task_list.remove(current_position)
+                    except ValueError:
+                        print("Point already visited")
                     priority_task_list[robot].remove(current_position)
                     current_position = next_position
                     priority_task_index[robot] -= 1
+                task_list.append(current_position)
+                # print('priority points surveyed, time elapsed is now',priority_survey_time_elapsed)
 
                 while True:
                     if len(task_list) == 1:
@@ -882,6 +1217,171 @@ class QLB:
                     next_position = task_list[indices[task_list.index(current_position)][1]]
                     task_list.remove(current_position)
                     current_position = next_position
+                # print('Total time for robot ',robot+1,'is',sum(waypoint_distances[robot])/self.robot_velocity)
+
+        elif planner == "SCoPE_Surveillance": #Added for new Elapsed Priority CPP on 11.1.2021
+            # goal_time = float(input("Visit these priority points within the next _ seconds:  "))
+            priority_points_visited = [0 for robot in range(self.number_of_partitions)]
+            priority_points_total = [0 for robot in range(self.number_of_partitions)]
+            psurvey = []
+            
+            
+            goal_time = 100
+            elapsed_task_list = [[] for robot in range(self.number_of_partitions)]
+            data_completion_time_per_robot = [0 for robot in range(self.number_of_partitions)]
+            priority_survey_distances = [[] for robot in range(self.number_of_partitions)]
+            trip_distances = [0 for robot in range(self.number_of_partitions)]
+            trip_distances_copy = copy.deepcopy(trip_distances)
+            priority_task_list = [[] for robot in range(self.number_of_partitions)]
+            priority_task_index = [0 for robot in range(self.number_of_partitions)]
+            initial_travel_distance = [0 for robot in range(self.number_of_partitions)]
+            initial_travel_distance_copy = copy.deepcopy(initial_travel_distance)
+            for robot, cell_list in enumerate(priority_waypoints_for_robots):
+                current_position = robot_assignment_information[robot][0:2]
+                task_list = np.transpose(cell_list).tolist()
+                task_list.append(current_position)
+                #priority_task_list[robot].append(current_position)
+                for ppoints in range(len(self.priority_points_in_cartesian)): 
+                    if self.priority_points_in_cartesian[ppoints][0] in priority_waypoints_for_robots[robot][0] \
+                        and self.priority_points_in_cartesian[ppoints][1] in priority_waypoints_for_robots[robot][1]:
+                        priority_task_list[robot].append([self.priority_points_in_cartesian[ppoints][0],self.priority_points_in_cartesian[ppoints][1]])
+                        priority_task_index[robot] += 1
+                        priority_points_total[robot] += 1
+                priority_task_list_copy = copy.deepcopy(priority_task_list)
+                ppoints_robot = priority_task_index[robot]
+                area_covered = 0
+                time_elapsed = 0
+                priority_survey_time = 0 
+                step = 0
+
+                #If the robot has some priority way-points, then the sub-routine will take effect
+                if priority_task_index[robot] != 0:
+                    priority_task_list_copy[robot].append(current_position)
+                    priority_marker = priority_task_index[robot]
+                    iter_time = 0
+                    iter = 0
+                    while priority_marker != 0:
+                        # print(priority_marker)
+                        nbrs = skn.NearestNeighbors(n_neighbors=2, algorithm='kd_tree', leaf_size=self.leaf_size).fit(
+                            priority_task_list_copy[robot])
+                        distances, indices = nbrs.kneighbors(priority_task_list_copy[robot])
+                        priority_survey_distances[robot].append(distances[priority_task_list_copy[robot].index(current_position)][1])
+                        next_position = priority_task_list_copy[robot][indices[priority_task_list_copy[robot].index(current_position)][1]]
+                        try:
+                            task_list.remove(current_position)
+                        except ValueError:
+                            # print("Point already visited")
+                            pass
+                        iter_time = sum(priority_survey_distances[robot]) / self.robot_velocity
+                        if iter_time < goal_time:
+                            priority_points_visited[robot] += 1
+                            # print('robot',robot,'will make it to',iter-1,'priority points out of',ppoints_robot) #Added 4.6.22
+                        iter += 1
+                        priority_task_list_copy[robot].remove(current_position)
+                        current_position = next_position
+                        priority_marker -= 1
+                        
+                        
+                    trip_distances_copy[robot] = sum(priority_survey_distances[robot]) #Iterate these instead, so I can get a feel for how many points each robot visits
+                    survey_time = trip_distances_copy[robot] / self.robot_velocity
+                    # print('distance over velocity is',survey_time)
+                    task_list.append(current_position) 
+                    priority_survey_time = survey_time
+                    time_to_fin = goal_time - priority_survey_time
+                    # if time_to_fin < 0:
+                    #     print('Robot',robot,'will not make it in time')
+                    # else:
+                    #     print('goal time is now', time_to_fin)
+                    # print('Time it will take to cover all priority points:',survey_time,'seconds')
+                
+                    priority_survey_time_elapsed = 0
+                    time_elapsed = 0
+                    while priority_survey_time_elapsed < time_to_fin:  
+                        if len(task_list) == 1:
+                            waypoint_distances[robot].append(
+                                sqrt((self.optimal_paths[robot][-1][0] - current_position[0]) ** 2 +
+                                    (self.optimal_paths[robot][-1][1] - current_position[1]) ** 2))
+                            self.optimal_paths[robot].append(current_position)
+                            task_list.remove(current_position)
+                            # print("Time elapsed never came close to user input time")
+                            break   
+                        
+                        if current_position in priority_task_list[robot]:
+                            priority_task_list[robot].remove(current_position)
+                            priority_task_index[robot] -= 1
+                            # print("priority point visited")
+                        self.optimal_paths[robot].append(current_position)
+                        nbrs = skn.NearestNeighbors(n_neighbors=2, algorithm='kd_tree', leaf_size=self.leaf_size).fit(
+                            task_list)
+                        distances, indices = nbrs.kneighbors(task_list)
+                        waypoint_distances[robot].append(distances[task_list.index(current_position)][1])
+                        priority_survey_distances[robot].append(distances[task_list.index(current_position)][1])
+                        trip_distances[robot] = sum(waypoint_distances[robot])
+                        if initial_travel_distance[robot] == 0:
+                            initial_travel_distance[robot] = distances[task_list.index(current_position)][1]
+                        next_position = task_list[indices[task_list.index(current_position)][1]]
+                        task_list.remove(current_position)
+                        current_position = next_position
+                        priority_survey_time_elapsed += distances[task_list.index(current_position)][1] / self.robot_velocity
+                        step += 1
+                        # print("step ",step)
+                        
+
+                # print('distance over velocity is',priority_survey_time_elapsed)
+                # print("Time elapsed for robot " +  str(robot+1) + " is currently: " + str(priority_survey_time_elapsed) + " Moving to priority points")
+
+                if priority_task_index[robot] != 0:
+                    priority_task_list[robot].append(current_position)
+                while priority_task_index[robot] != 0:
+                    # print('Priority points left for robot',robot+1,'is:',priority_task_index[robot])
+                    self.optimal_paths[robot].append(current_position)
+                    nbrs = skn.NearestNeighbors(n_neighbors=2, algorithm='kd_tree', leaf_size=self.leaf_size).fit(
+                        priority_task_list[robot])
+                    distances, indices = nbrs.kneighbors(priority_task_list[robot])
+                    waypoint_distances[robot].append(distances[priority_task_list[robot].index(current_position)][1])
+                    priority_survey_distances[robot].append(distances[priority_task_list[robot].index(current_position)][1])
+                    priority_survey_time_elapsed += distances[priority_task_list[robot].index(current_position)][1] / self.robot_velocity
+                    next_position = priority_task_list[robot][indices[priority_task_list[robot].index(current_position)][1]]
+                    try:
+                        task_list.remove(current_position)
+                    except ValueError:
+                        # print("Point already visited")
+                        pass
+                    priority_task_list[robot].remove(current_position)
+                    current_position = next_position
+                    priority_task_index[robot] -= 1
+                task_list.append(current_position)
+                # print('priority points surveyed, time elapsed is now',priority_survey_time_elapsed)
+
+                while True:
+                    if len(task_list) == 1:
+                        waypoint_distances[robot].append(
+                            sqrt((self.optimal_paths[robot][-1][0] - current_position[0]) ** 2 +
+                                (self.optimal_paths[robot][-1][1] - current_position[1]) ** 2))
+                        self.optimal_paths[robot].append(current_position)
+                        task_list.remove(current_position)
+                        break        
+                    self.optimal_paths[robot].append(current_position)
+                    nbrs = skn.NearestNeighbors(n_neighbors=2, algorithm='kd_tree', leaf_size=self.leaf_size).fit(
+                        task_list)
+                    distances, indices = nbrs.kneighbors(task_list)
+                    waypoint_distances[robot].append(distances[task_list.index(current_position)][1])
+                    next_position = task_list[indices[task_list.index(current_position)][1]]
+                    task_list.remove(current_position)
+                    current_position = next_position
+                # print('Total time for robot ',robot+1,'is',sum(waypoint_distances[robot])/self.robot_velocity)
+                if priority_points_total[robot] != 0:
+                    priority_surveillance_rate = priority_points_visited[robot] / priority_points_total[robot]
+                    psurvey.append(priority_surveillance_rate)
+                    # print('total time for robot',robot+1,'is',sum(waypoint_distances[robot])/self.robot_velocity)
+                    print('priority surveillance rate for robot',robot+1,'is:',priority_surveillance_rate)
+            self.averagepsurvey = np.average(psurvey)
+            # print('average surveillance rate:',self.averagepsurvey)
+
+
+
+
+
 
         # Save optimal path information to specified save path
         with open(self.save_path + "waypoints", 'wb') as f:
@@ -939,7 +1439,7 @@ class QLB:
             plt.axis("equal")
 
             plt.subplot(2, 2, 3)
-            if planner == "Priority_CPP" or planner == "Elapsed_Priority": #Added on 6.29.2021 for priority_CPP
+            if planner == "Priority_CPP" or planner == "Elapsed_Priority" or planner == "True_Elapsed": #Added on 6.29.2021 for priority_CPP
                 for robot_id in range(self.number_of_partitions):
                     plt.scatter(self.priority_final_partitioning_x[robot_id], self.priority_final_partitioning_y[robot_id], marker="s",
                                 s=self.plot_cell_size,
@@ -958,7 +1458,7 @@ class QLB:
 
             ax4 = plt.subplot(2, 2, 4)
 
-            if planner == "Priority_CPP" or planner == "Elapsed_Priority": #Added on 6.29.2021 for priority_CPP
+            if planner == "Priority_CPP" or planner == "Elapsed_Priority" or planner == "True_Elapsed": #Added on 6.29.2021 for priority_CPP
                 ax4.scatter(np.transpose(self.robot_initial_positions_in_cartesian)[0],
                             np.transpose(self.robot_initial_positions_in_cartesian)[1],
                             s=self.plot_robot_size, c="black")
@@ -1026,6 +1526,7 @@ class QLB:
         initial_travel_distance = [0 for robot in range(self.number_of_partitions)]
         for robot, d in enumerate(waypoint_distances):
             initial_travel_distance[robot] = d[0]
+            waypoint_distances[robot].pop(0)
         trip_distances = np.array(trip_distances) - np.array(initial_travel_distance)
         area_covered = 0
         t = 0
