@@ -7,7 +7,8 @@ from sklearn.cluster import MiniBatchKMeans
 import sklearn.neighbors as skn
 from math import sqrt, tan, radians
 #from Swarm_Surveillance.SCoPP 
-from SCoPP import latlongcartconv as lc
+# from SCoPP 
+import latlongcartconv as lc
 import copy
 import time
 import pickle
@@ -17,7 +18,8 @@ import sys #Ditto
 sys.modules['sklearn.externals.six'] = six #Ditto
 import mlrose
 #from Swarm_Surveillance.SCoPP 
-from SCoPP import SCoPP_settings
+# from SCoPP 
+import SCoPP_settings
 import random
 
 
