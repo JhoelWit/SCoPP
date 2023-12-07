@@ -35,7 +35,7 @@ class Debugger:
         self.robot_FOV = 150  # degrees
         self.robot_operating_height = 2  # meters
         self.robot_velocity = 10  # meters per second
-        self.save_path = "D:\p00hb\Documents\ADAMS Research\SCoPP\demo\Debug/"
+        self.save_path = "D:\p00hb\Documents\ADAMS_RESEARCH\SCoPP\demo\Debug/"
 
 class VeryLargeLafayetteFLood:
     def __init__(self, UAV):
@@ -48,7 +48,7 @@ class VeryLargeLafayetteFLood:
                                 [30.25465, -91.99934]]
         self.priority_points = [[30.27665, -91.94891], [30.31936, -92.00467], [30.25465, -91.99934]]
         self.geo_fencing_holes = []
-        self.save_path = "D:\p00hb\Documents\ADAMS Research\SCoPP\demo\VeryLargeLafayetteFlood/"
+        self.save_path = "D:\p00hb\Documents\ADAMS_RESEARCH\SCoPP\demo\VeryLargeLafayetteFlood/"
         if UAV == 0:  # Testing
             self.robot_FOV = 105  # degrees
             self.robot_operating_height = 20  # meters
@@ -106,7 +106,7 @@ class SmallLafayetteFLood:
                 elif mode[1] == "noconres":
                     self.save_path = "SmallLafayetteFlood/no_discontinuities/no_conflict_resolution/"
                 else:
-                    self.save_path = "D:\p00hb\Documents\ADAMS Research\SCoPP\demo\SmallLafayetteFlood/no_discontinuities/"
+                    self.save_path = "D:\p00hb\Documents\ADAMS_RESEARCH\SCoPP\demo\SmallLafayetteFlood/no_discontinuities/"
 
 
             elif mode[0] == "disc":
@@ -122,13 +122,13 @@ class SmallLafayetteFLood:
                 elif mode[1] == "noconres":
                     self.save_path = "SmallLafayetteFlood/discontinuities/no_conflict_resolution/"
                 else:
-                    self.save_path = "D:\p00hb\Documents\ADAMS Research\SCoPP\demo\SmallLafayetteFlood/discontinuities/"
+                    self.save_path = "D:\p00hb\Documents\ADAMS_RESEARCH\SCoPP\demo\SmallLafayetteFlood/discontinuities/"
         else:
             self.geo_fencing_holes = [
                     [[30.2465, -92.1481], [30.2454, -92.1474], [30.2446, -92.1486], [30.2452, -92.1498], [30.2463, -92.1494]]
                 ] #Added for priority_cpp on 11.9.2021
             # self.geo_fencing_holes = []
-            self.save_path = "D:\p00hb\Documents\ADAMS Research\SCoPP\demo\SmallLafayetteFlood/"
+            self.save_path = "D:\p00hb\Documents\ADAMS_RESEARCH\SCoPP\demo\SmallLafayetteFlood/"
             if UAV == 0:  # Map Comparison
                 self.robot_FOV = 105  # degrees
                 self.robot_operating_height = 12  # meters
@@ -211,7 +211,7 @@ class MediumLafayetteFLood:
 
         else:
             self.starting_position = [[30.24686, -92.03722]]
-            self.save_path = "D:\p00hb\Documents\ADAMS Research\SCoPP\demo\MediumLafayetteFlood/"
+            self.save_path = "D:\p00hb\Documents\ADAMS_RESEARCH\SCoPP\demo\MediumLafayetteFlood/"
 
             if UAV == 0:  # Testing
                 self.robot_FOV = 14  # degrees
@@ -320,7 +320,7 @@ class LargeLafayetteFLood:
 
         else:
             self.starting_position = [[30.24686, -92.03722]]
-            self.save_path = "D:\p00hb\Documents\ADAMS Research\SCoPP\demo\LargeLafayetteFLood/"
+            self.save_path = "D:\p00hb\Documents\ADAMS_RESEARCH\SCoPP\demo\LargeLafayetteFLood/"
             if UAV == 0:  # Testing
                 self.robot_FOV = 14  # degrees
                 self.robot_operating_height = 50  # meters
@@ -356,7 +356,7 @@ class Lejeune:
                                 [34.66780, -77.24813],
                                 [34.66734, -77.24578]]
         self.geo_fencing_holes = []
-        self.save_path = "D:\p00hb\Documents\ADAMS Research\SCoPP\demo\Lejeune/"
+        self.save_path = "D:\p00hb\Documents\ADAMS_RESEARCH\SCoPP\demo\Lejeune/"
         if UAV == 0:  # Testing
             self.robot_FOV = 105  # degrees
             self.robot_operating_height = 12  # meters
@@ -393,7 +393,7 @@ class Benning:
             [[32.38991, -84.81119], [32.38970, -84.81137], [32.38949, -84.81113], [32.38976, -84.81097]],
             [[32.39132, -84.81172], [32.39105, -84.81164], [32.39114, -84.81123], [32.39142, -84.81134]]
         ]
-        self.save_path = "D:\p00hb\Documents\ADAMS Research\SCoPP\demo\Benning/"
+        self.save_path = "D:\p00hb\Documents\ADAMS_RESEARCH\SCoPP\demo\Benning/"
         if UAV == 0:  # Testing
             self.robot_FOV = 105  # degrees
             self.robot_operating_height = 12  # meters
@@ -439,7 +439,7 @@ class HollandNewYorkAgriculture:
             [[42.73631, -78.56379], [42.73629, -78.56265], [42.73523, -78.56310], [42.73535, -78.56382]],
             [[42.73502, -78.56567], [42.73542, -78.56499], [42.73453, -78.56444], [42.73418, -78.56512]]
         ]
-        self.save_path = "D:\p00hb\Documents\ADAMS Research\SCoPP\demo\Holland_NY/"
+        self.save_path = "D:\p00hb\Documents\ADAMS_RESEARCH\SCoPP\demo\Holland_NY/"
         if UAV == 0:  # Testing
             self.robot_FOV = 105  # degrees
             self.robot_operating_height = 12  # meters
@@ -484,9 +484,9 @@ class Baseline_Envirnonment:
         self.robot_operating_height = 40  # meters
         self.robot_velocity = 4  # meters per second
         if solver == "SCoPP":
-            self.save_path = "D:\p00hb\Documents\ADAMS Research\SCoPP\demo\Baseline_Environment/QLB_runs/"
+            self.save_path = "D:\p00hb\Documents\ADAMS_RESEARCH\SCoPP\demo\Baseline_Environment/QLB_runs/"
         elif solver == "baseline":
-            self.save_path = "D:\p00hb\Documents\ADAMS Research\SCoPP\demo\Baseline_Environment/baseline_runs/"
+            self.save_path = "D:\p00hb\Documents\ADAMS_RESEARCH\SCoPP\demo\Baseline_Environment/baseline_runs/"
 
 
 
@@ -512,9 +512,9 @@ class BrooklynInitialTest:
         self.robot_operating_height = 12  # meters
         self.robot_velocity = 10  # meters per second
         if solver == "SCoPP":
-            self.save_path = "D:\p00hb\Documents\ADAMS Research\SCoPP\demo\Brooklyn_Init_Test/QLB_runs/"
+            self.save_path = "D:\p00hb\Documents\ADAMS_RESEARCH\SCoPP\demo\Brooklyn_Init_Test/QLB_runs/"
         elif solver == "baseline":
-            self.save_path = "D:\p00hb\Documents\ADAMS Research\SCoPP\demo\Brooklyn_Init_Test/baseline_runs/"
+            self.save_path = "D:\p00hb\Documents\ADAMS_RESEARCH\SCoPP\demo\Brooklyn_Init_Test/baseline_runs/"
 
 
 class NevadaExploration:
@@ -532,7 +532,7 @@ class NevadaExploration:
         self.robot_FOV = 50  # degrees
         self.robot_operating_height = 10  # meters
         self.robot_velocity = 10  # meters per second
-        self.save_path = "D:\p00hb\Documents\ADAMS Research\SCoPP\demo/NevadaExploration/"
+        self.save_path = "D:\p00hb\Documents\ADAMS_RESEARCH\SCoPP\demo/NevadaExploration/"
 
 
 class OntarioWaterRescue:
@@ -546,7 +546,7 @@ class OntarioWaterRescue:
         self.robot_FOV = 50  # degrees
         self.robot_operating_height = 10  # meters
         self.robot_velocity = 10  # meters per second
-        self.save_path = "D:\p00hb\Documents\ADAMS Research\SCoPP\demo\OntarioWaterRescue/"
+        self.save_path = "D:\p00hb\Documents\ADAMS_RESEARCH\SCoPP\demo\OntarioWaterRescue/"
 
 
 class SanAntonioFarming:
@@ -561,7 +561,7 @@ class SanAntonioFarming:
         self.robot_FOV = 50  # degrees
         self.robot_operating_height = 10  # meters
         self.robot_velocity = 10  # meters per second
-        self.save_path = "D:\p00hb\Documents\ADAMS Research\SCoPP\demo\SanAntonioFarming/"
+        self.save_path = "D:\p00hb\Documents\ADAMS_RESEARCH\SCoPP\demo\SanAntonioFarming/"
 
 class ShastaBuffaloSmall:
     """Impromptu class made for the SHaSTA simulation
@@ -594,4 +594,4 @@ class ShastaBuffaloSmall:
         self.robot_FOV = 150  # degrees
         self.robot_operating_height = 2  # meters
         self.robot_velocity = 4  # meters per second
-        self.save_path = "D:\p00hb\Documents\ADAMS Research\SCoPP\demo\ShastaBuffaloSmall/"
+        self.save_path = "D:\p00hb\Documents\ADAMS_RESEARCH\SCoPP\demo\ShastaBuffaloSmall/"
