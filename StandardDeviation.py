@@ -7,7 +7,7 @@ from matplotlib import pyplot as plt
 
 from pnplot import *
 
-data = 'D:\p00hb\Documents\ADAMS Research\Priority SCoPP Statistics.xlsx'
+data = 'Priority SCoPP Statistics.xlsx'
 
 header = ['0', '10', '100', '1000']
 

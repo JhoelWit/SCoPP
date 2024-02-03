@@ -7,7 +7,7 @@ from sklearn.cluster import MiniBatchKMeans
 import sklearn.neighbors as skn
 from math import sqrt, tan, radians
 #from Swarm_Surveillance.SCoPP 
-from SCoPP import latlongcartconv as lc
+import latlongcartconv as lc
 import copy
 import time
 import pickle
@@ -17,8 +17,9 @@ import sys #Ditto
 sys.modules['sklearn.externals.six'] = six #Ditto
 import mlrose
 #from Swarm_Surveillance.SCoPP 
-from SCoPP import SCoPP_settings
+import SCoPP_settings
 import random
+from file_utils import create_dir
 
 
 class QLB:
@@ -88,7 +89,7 @@ class QLB:
         self.robot_operating_height = environment.robot_operating_height
         self.robot_velocity = environment.robot_velocity
         geographical_geo_fencing_zones = environment.geo_fencing_holes
-        self.save_path = environment.save_path
+        self.save_path = create_dir(environment.save_path)
 
         # Initialize reference frame
         self.robot_initial_positions_in_cartesian = []
@@ -144,6 +145,7 @@ class QLB:
         self.leaf_size = algorithm_settings.leaf_size
         self.conflict_resolution_mode = algorithm_settings.conflict_resolution_mode
         self.planner = algorithm_settings.planner
+        self.tests = algorithm_settings.tests
         if algorithm_settings.partition_tolerance is None:
             self.partition_tolerance = 1 / 8 * self.cell_size
         else:
@@ -239,7 +241,10 @@ class QLB:
 
         # Commence partitioning of the discretized area
         time_stamp = time.time()
-        cells_as_dict, cell_space_as_dict, robot_assignment_information = self.partition_area(cell_space, cells) 
+        if "ablate-partition" not in self.tests:
+            cells_as_dict, cell_space_as_dict, robot_assignment_information = self.partition_area(cell_space, cells) 
+        else:
+            cells_as_dict, cell_space_as_dict, robot_assignment_information = self.ablate_partition_area(cell_space, cells)
         self.time_for_partitioning += time.time() - time_stamp
 
         # Commence conflict resolution
@@ -323,9 +328,25 @@ class QLB:
         # Plot results
         if self.plot:
            self.plot_partitioning(self.planner) #Added Self.planner on 6.29.2021
+        
+        info_dict = dict(
+            final_paths_latlon=final_paths_in_geographical,
+            priority_points_xy=priority_points_in_cartesian,
+            psr_average=self.averagepsurvey,
+            robot_paths=paths,
+            time=dict(
+                conversions=self.time_for_conversion,
+                initial_partitioning=self.time_for_partitioning,
+                path_planning=self.time_for_path_planning,
+                total_comp=self.total_time,
+            ),
+            mission=dict(
+                completion_time=self.data_total_mission_completion_time,
+            ),
+        )
 
         # Return final list of paths per robot
-        return final_paths_in_geographical, priority_points_in_cartesian, self.total_time, self.data_total_mission_completion_time, self.averagepsurvey, paths #Added for scalability testing on 7.30.2021
+        return info_dict #Added for scalability testing on 7.30.2021
 
     def discretize_area(self):
         """Discretization phase: distretizes the surveyable area and finds cells which lie within the bounds specified
@@ -544,7 +565,83 @@ class QLB:
                                                           column + self.cell_size / 2,
                                                           round(minimum_distance[robot_id] / self.cell_size)]
             robot_assignment_information[robot_id] = assignment_information
-            robot_initial_positions_copy.remove([assignment_information[0], assignment_information[1]])
+            if len(robot_initial_positions_copy):
+                robot_initial_positions_copy.remove([assignment_information[0], assignment_information[1]])
+
+        return cells_as_dict, cell_space_as_dict, robot_assignment_information
+    
+    def ablate_partition_area(self, cell_space, cells):
+        '''
+        Partitioning phase with ablation: divides surveyable area are into equally sized areas; one for each robot.
+        Each robot will receive an ~equal amount of cells, they will be partitioned not according to kmeans but N to S and E to W.
+        '''
+        cell_squares_within_boundary_x = cell_space[0]
+        cell_squares_within_boundary_y = cell_space[1]
+        cells_within_boundary_x = []
+        cells_within_boundary_y = []
+        for row, _ in enumerate(cells):
+            for column, _ in enumerate(cells[0]):
+                cells_within_boundary_x.append(row)
+                cells_within_boundary_y.append(column)
+        clustering_set = np.transpose([cell_squares_within_boundary_x, cell_squares_within_boundary_y])
+        self.partition_colors = lhs(3, samples=self.number_of_partitions)
+        self.partition_colors = np.round(self.partition_colors, decimals=1)
+        robot_assignment_information = [[] for robot in range(self.number_of_partitions)]
+        robot_initial_positions_copy = self.robot_initial_positions_in_cartesian.copy()
+        self.rough_partitioning_x = [[] for robot in range(self.number_of_partitions)]
+        self.rough_partitioning_y = [[] for robot in range(self.number_of_partitions)]
+        minimum_distance = [[np.Inf] for robot in range(self.number_of_partitions)]
+        cells_per_robot = np.array([len(clustering_set) / self.number_of_partitions] * self.number_of_partitions)
+        any_cells_remaining = len(clustering_set) % self.number_of_partitions
+        if any_cells_remaining:
+            cells_per_robot = np.floor(cells_per_robot)
+            cells_per_robot[:any_cells_remaining] += 1
+            print(f"cells_per_robot: {cells_per_robot}")
+        cell_space_as_dict = dict()
+        cells_as_dict = dict()
+        robot_cell_indices = dict()
+        temp_robot_id = 0
+        for cell in range(len(clustering_set)):
+            robot_cell_indices[cell] = temp_robot_id
+            cells_per_robot[temp_robot_id] -= 1
+            if cells_per_robot[temp_robot_id] == 0:
+                temp_robot_id += 1
+
+        cluster_centers_x, cluster_centers_y = [], []
+        temp_sum_x, temp_sum_y = 0, 0
+        for robot_id in range(self.number_of_partitions):
+            for point_index, point in enumerate(clustering_set):
+                if robot_cell_indices[point_index] != robot_id:
+                    continue
+                else:
+                    row = point[0]
+                    column = point[1]
+                    temp_sum_x += row
+                    temp_sum_y += column
+                    self.rough_partitioning_x[robot_id].append(row)
+                    self.rough_partitioning_y[robot_id].append(column)
+                    cell_space_as_dict[column, row] = robot_id
+                    if row % self.cell_size == 0 and column % self.cell_size == 0:
+                        cells_as_dict[column, row] = robot_id
+                        for pos in robot_initial_positions_copy:
+                            if np.linalg.norm(
+                                    [row - pos[0] + 0.0001,
+                                    column - pos[1] + 0.0001]) < minimum_distance[robot_id]:
+                                minimum_distance[robot_id] = np.linalg.norm(
+                                    [row - pos[0] + 0.0001, column - pos[1] + 0.0001])
+                                assignment_information = [pos[0], pos[1], row + self.cell_size / 2,
+                                                        column + self.cell_size / 2,
+                                                        round(minimum_distance[robot_id] / self.cell_size)]
+            # Updating centroid information
+            centroid_x = temp_sum_x / len(self.rough_partitioning_x[robot_id])
+            centroid_y = temp_sum_y / len(self.rough_partitioning_y[robot_id])
+            temp_sum_x, temp_sum_y = 0, 0
+            cluster_centers_x.append(centroid_x)
+            cluster_centers_y.append(centroid_y)
+            robot_assignment_information[robot_id] = assignment_information
+            if len(robot_initial_positions_copy):
+                robot_initial_positions_copy.remove([assignment_information[0], assignment_information[1]])
+        self.cluster_centers = [cluster_centers_x, cluster_centers_y]
 
         return cells_as_dict, cell_space_as_dict, robot_assignment_information
 
